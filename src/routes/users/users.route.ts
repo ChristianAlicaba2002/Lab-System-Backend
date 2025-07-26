@@ -1,10 +1,10 @@
 import { createRoute, z } from '@hono/zod-openapi'
-import { patchUserSchema, userInsertSchema } from '@/db/schema'
+import { userInsertSchema } from '@/db/schema'
 import jsonContent from '@/middleware/utils/json-content'
 import * as httpStatusCodes from '@/openapi/http-status-codes'
 
-export const createUser = createRoute({
-  tags: ['Users'],
+export const createUserRoute = createRoute({
+  tags: ['users'],
   method: 'post',
   path: '/users',
   request: {
@@ -19,7 +19,10 @@ export const createUser = createRoute({
   },
   responses: {
     [httpStatusCodes.CREATED]: jsonContent(
-      patchUserSchema,
+      z.object({
+        message: z.string(),
+        data: userInsertSchema.omit({ password: true }),
+      }),
       'User successfully created',
     ),
     [httpStatusCodes.BAD_REQUEST]: jsonContent(
@@ -39,4 +42,4 @@ export const createUser = createRoute({
   },
 })
 
-export type CreateRoute = typeof createUser
+export type CreateUserRoute = typeof createUserRoute
