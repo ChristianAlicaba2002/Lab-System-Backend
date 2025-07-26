@@ -25,11 +25,7 @@
     "nanoid": "^5.1.5",
     "pino-pretty": "^13.0.0",
     "postgres": "^3.4.7",
-<<<<<<< HEAD
-    "zod": "^4.0.5"
-=======
     "zod": "^4.0.10"
->>>>>>> upstream/develop
   },
   "devDependencies": {
     "@antfu/eslint-config": "^4.19.0",
