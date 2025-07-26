@@ -15,7 +15,7 @@
   },
   "vars": {
     "NODE_ENV": "production"
-  },
+  }
   // "vars": {
   //   "MY_VAR": "my-variable"
   // },

@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1753340621304,
+      "tag": "0000_fresh_oracle",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1753448574839,
+      "tag": "0001_tiny_leech",
+      "breakpoints": true
+    }
+  ]
+}

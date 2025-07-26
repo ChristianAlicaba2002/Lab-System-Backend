@@ -3,6 +3,7 @@ import { createRouter } from '@/lib/create-app'
 import jsonContent from '@/middleware/utils/json-content'
 import * as httpStatusCodes from '@/openapi/http-status-codes'
 
+// This is default route
 const router = createRouter()
   .openapi(createRoute({
     tags: ['Index'],
@@ -21,5 +22,4 @@ const router = createRouter()
       message: 'Hono API',
     })
   })
-
 export default router
