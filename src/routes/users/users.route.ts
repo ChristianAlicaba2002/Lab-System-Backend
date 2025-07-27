@@ -1,27 +1,31 @@
+/**
+ * @fileoverview User route definitions with OpenAPI specifications
+ */
+
 import { createRoute, z } from '@hono/zod-openapi'
 import { userInsertSchema } from '@/db/schema'
-import jsonContent from '@/middleware/utils/json-content'
+import jsonContent, { jsonContentRequired } from '@/middleware/utils/json-content'
 import * as httpStatusCodes from '@/openapi/http-status-codes'
 
+/**
+ * User creation route with role-based access (teacher/technical_staff/admin).
+ * Validates email/username uniqueness and password strength requirements.
+ */
 export const createUserRoute = createRoute({
-  tags: ['users'],
+  tags: ['Users'],
   method: 'post',
   path: '/users',
   request: {
-    body: {
-      content: {
-        'application/json': {
-          schema: userInsertSchema,
-        },
-      },
-      required: true,
-    },
+    body: jsonContentRequired(
+      userInsertSchema,
+      'The user to create',
+    ),
   },
   responses: {
     [httpStatusCodes.CREATED]: jsonContent(
       z.object({
         message: z.string(),
-        data: userInsertSchema.omit({ password: true }),
+        data: userInsertSchema.omit({ password: true, confirmPassword: true }),
       }),
       'User successfully created',
     ),

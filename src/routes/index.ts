@@ -1,3 +1,7 @@
+/**
+ * @fileoverview Root routes - API welcome and health check endpoints
+ */
+
 import { createRoute, z } from '@hono/zod-openapi'
 import { createRouter } from '@/lib/create-app'
 import jsonContent from '@/middleware/utils/json-content'
@@ -5,6 +9,7 @@ import * as httpStatusCodes from '@/openapi/http-status-codes'
 
 // This is default route
 const router = createRouter()
+  // API welcome message
   .openapi(createRoute({
     tags: ['Index'],
     method: 'get',
@@ -22,6 +27,7 @@ const router = createRouter()
       message: 'Hono API',
     })
   })
+  // Health check for monitoring
   .openapi(createRoute({
     tags: ['Health Check'],
     method: 'get',
