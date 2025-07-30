@@ -1,43 +1,37 @@
 /**
- * @fileoverview User creation handler with secure password hashing and role-based access
+ * @fileoverview User creation handler - delegates to UserService for business logic
  */
 
 import type { AppRouteHandler } from '@/lib/types/app-types'
 import type { CreateUserRoute } from '@/routes/users/users.route'
-import bcrypt from 'bcryptjs'
-import { createDb } from '@/db'
-import { users } from '@/db/schema'
 import * as httpStatusCodes from '@/openapi/http-status-codes'
+import { UserService } from '@/services/UserService'
 
 /**
  * Creates new user accounts with role-based access control.
- * Handles password security, uniqueness validation, and audit logging.
+ * Delegates business logic to UserService for better separation of concerns.
  */
 export const CreateUserHandler: AppRouteHandler<CreateUserRoute> = async (c) => {
   // The validated request body is destructured since the confirmPassword is now useless after validation in the middleware
-  const { confirmPassword, ...validatedBody } = c.req.valid('json')
+  const { confirmPassword, firstname, lastname, ...validatedBody } = c.req.valid('json')
 
   try {
-    // Use bcrypt with 10 rounds for security/performance balance
-    const hashedPassword = await bcrypt.hash(validatedBody.password, 10)
+    const userService = new UserService(c)
 
-    const db = createDb(c)
-    const [createdUser] = await db
-      .insert(users)
-      .values({
-        password: hashedPassword,
-        username: validatedBody.username,
-        user_type: validatedBody.user_type,
-        email: validatedBody.email,
-      })
-      .returning()
+    const userData = {
+      ...validatedBody,
+      firstname,
+      lastname,
+    }
 
-    // Destructured the inserted user object so we don't return the password
+    const { user: createdUser, roleRecord } = await userService.createUser(userData)
+
+    // Success! Remove password from response
     const { password, ...userWithoutPassword } = createdUser
 
     return c.json(
       {
-        message: 'User created successfully',
+        message: `User created successfully${roleRecord ? ` with ${validatedBody.user_type} profile` : ''}`,
         data: userWithoutPassword,
       },
       httpStatusCodes.CREATED,
@@ -48,6 +42,7 @@ export const CreateUserHandler: AppRouteHandler<CreateUserRoute> = async (c) => 
     c.var.logger.error('User creation failed', {
       error: (err as Error).message,
       email: validatedBody.email,
+      user_type: validatedBody.user_type,
       timestamp: new Date().toISOString(),
     })
 

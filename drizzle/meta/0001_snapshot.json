@@ -1,13 +1,69 @@
 {
-<<<<<<< HEAD
-  "id": "fc14d72b-427c-4f6b-acf6-b73cda87c0d0",
-=======
-  "id": "4ff14dbf-54ac-417b-b364-b58600985107",
->>>>>>> upstream/develop
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "c6a59efa-ae64-411f-9513-20c5e2435bf0",
+  "prevId": "4ff14dbf-54ac-417b-b364-b58600985107",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.teachers": {
+      "name": "teachers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(12)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "varchar(12)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attendance": {
+          "name": "attendance",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'present'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "teachers_user_id_users_id_fk": {
+          "name": "teachers_user_id_users_id_fk",
+          "tableFrom": "teachers",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.users": {
       "name": "users",
       "schema": "",
@@ -91,8 +147,4 @@
     "schemas": {},
     "tables": {}
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> upstream/develop
