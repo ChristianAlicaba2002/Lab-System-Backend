@@ -1,5 +1,4 @@
 import { z } from '@hono/zod-openapi'
-import { sql } from 'drizzle-orm'
 import { boolean, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core'
 import { createSchemaFactory } from 'drizzle-zod'
 import { nanoid } from 'nanoid'
@@ -19,11 +18,13 @@ export const users = pgTable('users', {
   password: varchar({ length: 255 }).notNull(),
   username: varchar({ length: 255 }).notNull().unique(),
   user_type: varchar({ length: 20 }).notNull(), // 'teacher', 'technical_staff', 'admin'
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  is_deleted: boolean().default(false),
+  deleted_at: timestamp({ mode: 'date' }),
+  created_at: timestamp({ mode: 'date' }).notNull().defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 const { createSelectSchema, createInsertSchema } = createSchemaFactory({
@@ -52,16 +53,85 @@ export const userInsertSchema = createInsertSchema(users, {
       .string()
       .min(8)
       .regex(/^(?=.*[A-Z])(?=.*\d)/i),
-    confirmPassword: z.string(),
+    confirm_password: z.string(),
     user_type: z.string().transform(val => val.toLowerCase()),
+    username: z.string().min(8).transform(val => val.toLowerCase()),
     firstname: z.preprocess(val => val === '' ? undefined : val, z.string().min(1).optional()),
     lastname: z.preprocess(val => val === '' ? undefined : val, z.string().min(1).optional()),
   })
-  .refine(data => data.password === data.confirmPassword, {
+  .refine(data => data.password === data.confirm_password, {
     error: 'Passwords don\'t match',
   })
 
-export const patchUserSchema = userInsertSchema.partial()
+export const patchUserSchema = z.object({
+  // Email - only validate format when provided
+  email: z.string()
+    .optional()
+    .refine(
+      val => !val || val === '' || z.string().email().safeParse(val).success,
+      { message: 'Invalid email address' },
+    )
+    .transform(val => val === '' ? undefined : val),
+
+  // Password - only validate strength when provided
+  password: z.string()
+    .optional()
+    .refine(
+      val => !val || val === '' || (val.length >= 8 && /^(?=.*[A-Z])(?=.*\d)/i.test(val)),
+      { message: 'Password must be at least 8 characters with at least one uppercase letter and one number' },
+    )
+    .transform(val => val === '' ? undefined : val),
+
+  // Username - only validate length and transform when provided
+  username: z.string()
+    .optional()
+    .refine(
+      val => !val || val === '' || val.length >= 8,
+      { message: 'Username must be at least 8 characters' },
+    )
+    .transform(val => val === '' ? undefined : val?.toLowerCase()),
+
+  // User type - transform to lowercase when provided
+  user_type: z.string()
+    .optional()
+    .transform(val => val === '' ? undefined : val?.toLowerCase()),
+
+  // First name - validate when provided
+  firstname: z.string()
+    .optional()
+    .refine(
+      val => !val || val === '' || val.length >= 1,
+      { message: 'First name cannot be empty' },
+    )
+    .transform(val => val === '' ? undefined : val),
+
+  // Last name - validate when provided
+  lastname: z.string()
+    .optional()
+    .refine(
+      val => !val || val === '' || val.length >= 1,
+      { message: 'Last name cannot be empty' },
+    )
+    .transform(val => val === '' ? undefined : val),
+
+  // Confirm password - for password updates
+  confirm_password: z.string()
+    .optional()
+    .transform(val => val === '' ? undefined : val),
+})
+  .refine(
+    (data) => {
+    // Only check password confirmation if both password and confirmPassword are provided
+      if (data.password && data.confirm_password) {
+        return data.password === data.confirm_password
+      }
+      return true
+    },
+    {
+      message: 'Passwords don\'t match',
+      path: ['confirmPassword'], // Error will be attached to confirmPassword field
+    },
+  )
 
 export const teachers = pgTable('teachers', {
   id: varchar({ length: 12 })
@@ -73,11 +143,11 @@ export const teachers = pgTable('teachers', {
   firstname: varchar({ length: 100 }),
   lastname: varchar({ length: 100 }),
   attendance: varchar({ length: 20 }).notNull().default('present'),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  created_at: timestamp({ mode: 'date' }).notNull().defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 export const teacherSelectSchema = createSelectSchema(teachers)
@@ -105,11 +175,11 @@ export const technical_staff = pgTable('technical_staff', {
     .references(() => users.id),
   firstname: varchar({ length: 100 }),
   lastname: varchar({ length: 100 }),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  created_at: timestamp({ mode: 'date' }).notNull().defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 export const technicalStaffSelectSchema = createSelectSchema(technical_staff)
@@ -138,11 +208,11 @@ export const admins = pgTable('admins', {
     .references(() => users.id),
   firstname: varchar({ length: 100 }),
   lastname: varchar({ length: 100 }),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  created_at: timestamp({ mode: 'date' }).notNull().defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 export const adminSelectSchema = createSelectSchema(admins)
@@ -167,13 +237,13 @@ export const laboratory = pgTable('laboratory', {
     .$default(() => nanoid(12)),
   name: varchar({ length: 128 }).notNull(),
   status: boolean().default(true),
-  time_in: timestamp(),
-  time_out: timestamp(),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  time_in: timestamp({ mode: 'date' }),
+  time_out: timestamp({ mode: 'date' }),
+  created_at: timestamp({ mode: 'date' }).notNull().defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 export const laboratorySelectSchema = createSelectSchema(laboratory)
@@ -201,11 +271,11 @@ export const students = pgTable('students', {
   student_id: varchar({ length: 50 }).notNull().unique(),
   section: varchar({ length: 30 }).notNull(),
   course: varchar({ length: 50 }).notNull(),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  created_at: timestamp({ mode: 'date' }).notNull().defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 export const studentSelectSchema = createSelectSchema(students)
@@ -228,11 +298,11 @@ export const subjects = pgTable('subjects', {
   id: varchar({ length: 12 }).primaryKey().$default(() => nanoid(12)),
   subject_name: varchar({ length: 255 }).notNull(),
   subject_code: varchar({ length: 50 }).notNull(),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  created_at: timestamp({ mode: 'date' }).notNull().defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 export const schedule = pgTable('schedule', {
@@ -247,14 +317,14 @@ export const schedule = pgTable('schedule', {
     .references(() => teachers.id),
   subject_id: varchar({ length: 12 }).notNull().references(() => subjects.id),
   section: varchar({ length: 30 }).notNull(),
-  start_time: timestamp().notNull(),
-  end_time: timestamp().notNull(),
+  start_time: timestamp({ mode: 'date' }).notNull(),
+  end_time: timestamp({ mode: 'date' }).notNull(),
   status: varchar({ length: 20 }).default('scheduled'),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  created_at: timestamp({ mode: 'date' }).notNull().defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 export const scheduleSelectSchema = createSelectSchema(schedule)
@@ -294,11 +364,11 @@ export const seating_plan = pgTable('seating_plan', {
   mouse_status: varchar({ length: 255 }).notNull(),
   keyboard_status: varchar({ length: 255 }).notNull(),
   cables_status: varchar({ length: 255 }).notNull(),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  created_at: timestamp({ mode: 'date' }).notNull().defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 export const seatingPlanSelectSchema = createSelectSchema(seating_plan)
@@ -336,11 +406,11 @@ export const seating_history = pgTable('seating_history', {
   mouse: varchar({ length: 255 }).notNull(),
   keyboard: varchar({ length: 255 }).notNull(),
   cables: varchar({ length: 255 }).notNull(),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  created_at: timestamp({ mode: 'date' }).notNull().defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 export const seatingHistorySelectSchema = createSelectSchema(seating_history)
@@ -369,16 +439,21 @@ export const lab_activity_log = pgTable('lab_activity_log', {
   laboratory_id: varchar({ length: 12 })
     .notNull()
     .references(() => laboratory.id),
-  schedule_id: varchar({ length: 12 }).references(() => schedule.id),
-  seating_id: varchar({ length: 12 }).references(() => seating_history.id),
-  status: varchar({ length: 50 }).notNull(),
-  time_in: timestamp(),
-  time_out: timestamp(),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
+  schedule_id: varchar({ length: 12 })
+    .references(() => schedule.id),
+  seating_id: varchar({ length: 12 })
+    .references(() => seating_history.id),
+  status: varchar({ length: 50 })
+    .notNull(),
+  time_in: timestamp({ mode: 'date' }),
+  time_out: timestamp({ mode: 'date' }),
+  created_at: timestamp({ mode: 'date' })
+    .notNull()
+    .defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
     .notNull()
     .defaultNow()
-    .$onUpdate(() => sql`NOW()`),
+    .$onUpdate(() => new Date()),
 })
 
 export const labActivityLogSelectSchema = createSelectSchema(lab_activity_log)
@@ -400,3 +475,29 @@ export const labActivityLogInsertSchema = createInsertSchema(lab_activity_log)
 
 export const patchLabActivityLogSchema
   = createInsertSchema(lab_activity_log).partial()
+
+export const refreshTokens = pgTable('refresh_tokens', {
+  id: varchar({ length: 12 })
+    .primaryKey()
+    .$default(() => nanoid(12)),
+  user_id: varchar('user_id', { length: 12 })
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  token_hash: varchar('token_hash', { length: 255 })
+    .notNull()
+    .unique(),
+  expires_at: timestamp('expires_at', { mode: 'date' })
+    .notNull()
+    .unique(),
+  created_at: timestamp({ mode: 'date' })
+    .notNull()
+    .defaultNow(),
+  updated_at: timestamp({ mode: 'date' })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+})
+
+export const refreshTokenSelectSchema = createSelectSchema(refreshTokens)
+export const refreshTokenInsertSchema = createInsertSchema(refreshTokens)
+  .omit({ id: true, createdAt: true, updatedAt: true })
